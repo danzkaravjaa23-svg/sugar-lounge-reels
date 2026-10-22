@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+.claude/settings.local.json
+test-fixtures/
+dist/
+mac/AppIcon-preview.png

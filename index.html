@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="mn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sugar Lounge Reels</title>
+  <meta name="theme-color" content="#0e080d">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SL Reels">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <img class="brand-icon" src="icons/icon-192.png" alt="">
+    <div>
+      <h1>Sugar Lounge Reels</h1>
+      <p id="recipeBadge" class="muted">Хэв маяг v0</p>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="stage" aria-label="Урьдчилан харах">
+      <div class="stage-frame">
+        <div id="videoPool" class="video-pool" aria-hidden="true"></div>
+        <canvas id="preview"></canvas>
+        <div id="stageEmpty" class="stage-empty">Бичлэг эсвэл зураг нэмээд эхэл</div>
+      </div>
+      <div class="transport">
+        <button id="playBtn" class="icon-btn play" aria-label="Тоглуулах" disabled>▶</button>
+        <input id="scrub" type="range" min="0" max="0" step="0.01" value="0" aria-label="Цаг" disabled>
+        <span id="timeLabel" class="time">0.0 / 0.0с</span>
+      </div>
+      <label class="toggle"><input id="safeToggle" type="checkbox"> Instagram-ын товч, бичвэрт дарагдах бүсийг харуулах</label>
+    </section>
+
+    <div class="panels">
+      <section class="panel lockable preset-panel">
+        <label class="field inline"><span>Загвар</span><select id="preset" aria-label="Загвар"></select></label>
+        <p id="presetHint" class="hint"></p>
+      </section>
+
+      <section class="panel lockable">
+        <h2><span class="step">1</span> Бичлэг ба зураг</h2>
+        <label class="btn primary">+ Нэмэх<input id="clipInput" type="file" accept="video/*,image/*" multiple hidden></label>
+        <p id="clipStatus" class="muted" hidden></p>
+        <ol id="clipList" class="clip-list"></ol>
+        <p class="hint">Дарааллыг ↑ ↓-оор солино. ⭐ = хамгийн хөдөлгөөнтэй клип (эхний 3 секундын hook). Бичлэг бүрээс хамгийн амьд хэсгийг автоматаар авна. Mac дээр файлаа чирээд тавьж болно.</p>
+      </section>
+
+      <section class="panel lockable">
+        <h2><span class="step">2</span> Хөгжим</h2>
+        <div class="row">
+          <label class="btn">Хөгжим сонгох<input id="musicInput" type="file" accept="audio/*" hidden></label>
+          <span id="musicName" class="muted">Хөгжим сонгоогүй</span>
+          <button id="musicClear" class="btn ghost" hidden>Арилгах</button>
+        </div>
+        <p id="bpmLabel" class="hint"></p>
+        <label class="field inline"><span>Хөгжмийн эхлэх цэг (сек)</span><input id="musicOffset" type="number" min="0" step="0.5" inputmode="decimal"></label>
+        <label class="field inline"><span>BPM гараар (хоосон = автомат)</span><input id="bpmInput" type="number" min="40" max="240" step="1" inputmode="numeric" placeholder="авто"></label>
+        <p class="hint">Cut бүр хөгжмийн beat дээр буудаг. Хөгжмийн эрх: Instagram-ын дууны сан бизнес хаягт хаалттай тул эрхтэй файл ашиглах, эсвэл хөгжимгүй гаргаад Instagram дотроос дуу нэмнэ.</p>
+      </section>
+
+      <section class="panel lockable">
+        <h2><span class="step">3</span> Текст ба лого</h2>
+        <label class="field"><span>Эхний текст (hook)</span><input id="introText" type="text" maxlength="60"></label>
+        <label id="outroField" class="field"><span>Төгсгөлийн текст — 3 мөр хүртэл, ганц үйлдэл (захиалга эсвэл "найздаа явуул")</span><textarea id="outroText" rows="3"></textarea></label>
+        <div class="field">
+          <span>Лого — PNG, тунгалаг дэвсгэртэй байвал сайн</span>
+          <div class="row">
+            <label class="btn">Лого сонгох<input id="logoInput" type="file" accept="image/*" hidden></label>
+            <img id="logoPreview" class="logo-preview" alt="Лого" hidden>
+            <button id="logoClear" class="btn ghost" hidden>Арилгах</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2><span class="step">4</span> Видео гаргах</h2>
+        <button id="exportBtn" class="btn primary wide" disabled>🎬 Видео гаргах</button>
+        <div id="exportProgress" class="progress" hidden>
+          <div class="bar"><div id="exportBar"></div></div>
+          <span id="exportLabel" class="muted">Бэлтгэж байна…</span>
+        </div>
+        <p id="exportNote" class="hint">Гаргаж байх үед энэ цонхыг нээлттэй байлга — видео бодит хугацаанд бичигдэнэ.</p>
+        <div id="result" class="result" hidden>
+          <video id="resultVideo" controls playsinline></video>
+          <div class="row">
+            <button id="saveBtn" class="btn primary">Хадгалах</button>
+            <span id="resultInfo" class="muted"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Сурсан дүрмүүд</h2>
+        <ul id="lessonList" class="lessons"></ul>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
