@@ -1,0 +1,56 @@
+# main руу push хийх бүрт Mac програмыг GitHub-ийн macOS машин дээр бүтээж,
+# "latest" release-д zip-ээр хавсаргана → хэн ч вэбээс татаж авч болно.
+name: Mac app
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Sugar Lounge Reels.app
+        run: |
+          chmod +x scripts/build-mac-app.sh
+          scripts/build-mac-app.sh --no-install
+
+      - name: Self-test (export + save a reel headlessly)
+        run: |
+          python3 -m pip install --quiet pillow
+          swiftc -O scripts/make_fixtures.swift -o dist/make_fixtures
+          mkdir -p test-fixtures
+          dist/make_fixtures test-fixtures/vid-a.mp4 3.2 0.48 0.12 0.31
+          dist/make_fixtures test-fixtures/vid-b.mp4 4.5 0.12 0.31 0.48
+          python3 - <<'EOF'
+          from PIL import Image
+          for i, c in enumerate([(255, 95, 162), (255, 211, 110)], start=1):
+              Image.new("RGB", (1080, 1920), c).save(f"test-fixtures/photo{i}.jpg")
+          EOF
+          python3 scripts/make_test_music.py 124
+          "dist/Sugar Lounge Reels.app/Contents/MacOS/SugarLoungeReels" --selftest "$PWD/test-fixtures" "$PWD/dist/selftest"
+
+      - name: Zip
+        run: |
+          cd dist
+          ditto -c -k --keepParent "Sugar Lounge Reels.app" "Sugar-Lounge-Reels-mac.zip"
+          ls -la "Sugar-Lounge-Reels-mac.zip"
+
+      - name: Publish "latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          STAMP="$(date -u +%Y-%m-%d) · ${GITHUB_SHA::7}"
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest "dist/Sugar-Lounge-Reels-mac.zip" \
+            --title "Sugar Lounge Reels — Mac ($STAMP)" \
+            --notes-file .github/release-notes.md

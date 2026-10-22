@@ -5,6 +5,16 @@ Sugar Lounge-ийн Instagram reels-ийг **нэг хэв маягаар** ав
 Mac дээр хөтчөөр, iPhone дээр "Add to Home Screen" хийсэн апп шиг ажиллана.
 Сервер, бүртгэл хэрэггүй — бүх зүйл төхөөрөмж дээр л болдог.
 
+## Татаж авах
+
+| Хаана | Хэрхэн |
+|---|---|
+| **Mac програм** | [Releases → Sugar-Lounge-Reels-mac.zip](https://github.com/danzkaravjaa23-svg/sugar-lounge-reels/releases/latest) татаад задлана. Анх нээхэд Finder дээр **баруун товч → Open → Open** (Apple-ийн гэрчилгээгүй тул нэг удаа асуудаг). Видео MP4. |
+| **iPhone / хөтөч** | **https://danzkaravjaa23-svg.github.io/sugar-lounge-reels/** — iPhone Safari дээр Share → Add to Home Screen. Mac дээр Safari-гаар нээвэл MP4, Chrome-оор WebM. |
+
+Mac програм `main` салбарт push хийх бүрт GitHub Actions дээр автоматаар бүтээгдэж,
+"latest" release-д шинэчлэгдэнэ — суулгасан програмаа дахин татаж солиход л хангалттай.
+
 ## Бүтэц
 
 ```
