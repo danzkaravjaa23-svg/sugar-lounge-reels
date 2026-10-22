@@ -55,6 +55,16 @@ scripts/build-mac-app.sh
 "dist/Sugar Lounge Reels.app/Contents/MacOS/SugarLoungeReels" --selftest "$PWD/test-fixtures" "$PWD/dist/selftest"
 ```
 
+**Командаар reel гаргах** (цонх нээлгүй, олон reel-ийг дараалан): хавтсанд клипүүдээ нэрийн
+дарааллаар (`1-pour.mp4`, `2-walk.mp4` …) + нэг хөгжим (wav/mp3/m4a) хийгээд:
+
+```bash
+"dist/Sugar Lounge Reels.app/Contents/MacOS/SugarLoungeReels" --render ~/reel-clips ~/reel-out vibe sugar-friday
+```
+
+→ `~/reel-out/sugar-friday.mp4`. Загвар: `vibe` | `cocktail` | `ktv` | `story`. Хөгжмийн BPM автоматаар илэрч,
+cut бүр beat дээр буудаг. Эрхийн асуудалгүй туршилтын хөгжим: `python3 scripts/make_lounge_track.py 122`.
+
 ## Хөтчөөр ажиллуулах (хөгжүүлэлтэд)
 
 Claude Code дотроос: Browser pane → `reels` preview (`.claude/launch.json`-д байна).

@@ -77,43 +77,103 @@ final class BundleSchemeHandler: NSObject, WKURLSchemeHandler {
   }
 }
 
-// MARK: - Өөрийгөө шалгах горим
+// MARK: - Цонхгүй горимууд: --selftest (өөрийгөө шалгах) ба --render (хавтаснаас reel гаргах)
+//
+//   SugarLoungeReels --selftest <fixtures-dir> <out-dir>
+//   SugarLoungeReels --render <clips-dir> <out-dir> [preset] [name]
+//     clips-dir: mp4/mov/jpg/png клипүүд (нэрийн дарааллаар) + нэг хөгжим (wav/mp3/m4a) байж болно
+//     preset: vibe | cocktail | ktv | story (анхдагч vibe); name: гаралтын файлын нэр (.mp4-гүй)
 
 struct SelfTest {
+  enum Mode { case selftest, render }
+  let mode: Mode
   let fixtures: URL
   let outDir: URL
+  let preset: String
+  let outName: String?
 
   static func parse(_ args: [String]) -> SelfTest? {
-    guard let i = args.firstIndex(of: "--selftest"), args.count > i + 2 else { return nil }
-    return SelfTest(fixtures: URL(fileURLWithPath: args[i + 1]), outDir: URL(fileURLWithPath: args[i + 2]))
+    if let i = args.firstIndex(of: "--selftest"), args.count > i + 2 {
+      return SelfTest(mode: .selftest, fixtures: URL(fileURLWithPath: args[i + 1]), outDir: URL(fileURLWithPath: args[i + 2]),
+                      preset: "vibe", outName: nil)
+    }
+    if let i = args.firstIndex(of: "--render"), args.count > i + 2 {
+      let preset = args.count > i + 3 ? args[i + 3] : "vibe"
+      let name = args.count > i + 4 ? args[i + 4] : nil
+      return SelfTest(mode: .render, fixtures: URL(fileURLWithPath: args[i + 1]), outDir: URL(fileURLWithPath: args[i + 2]),
+                      preset: preset, outName: name)
+    }
+    return nil
   }
 
-  // Туршилтын файлуудыг нэмж, видео гаргана. Үлдсэнийг (⌘Q асуулт, хадгалах) native тал удирдана.
-  static let script = """
+  var timeoutSeconds: Double { mode == .render ? 900 : 150 }
+
+  // Хавтасны файлууд: клипүүд нэрийн дарааллаар, хөгжим тусдаа
+  var fileList: [[String: String]] {
+    let names = ((try? FileManager.default.contentsOfDirectory(atPath: fixtures.path)) ?? []).sorted()
+    let video = ["mp4", "mov", "m4v", "webm"], image = ["jpg", "jpeg", "png", "heic", "webp"], audio = ["wav", "mp3", "m4a", "aac", "aiff"]
+    return names.compactMap { n in
+      let ext = (n as NSString).pathExtension.lowercased()
+      if video.contains(ext) { return ["name": n, "kind": "video", "type": "video/\(ext == "mov" ? "quicktime" : ext)"] }
+      if image.contains(ext) { return ["name": n, "kind": "image", "type": "image/\(ext == "jpg" ? "jpeg" : ext)"] }
+      if audio.contains(ext) { return ["name": n, "kind": "audio", "type": "audio/\(ext == "mp3" ? "mpeg" : ext)"] }
+      return nil
+    }
+  }
+
+  // Файлуудыг нэмж, хөгжмийг beat-д тааруулж, видео гаргана. Хадгалахыг native тал удирдана.
+  var script: String {
+    let files: [[String: String]]
+    if mode == .selftest {
+      files = [["name": "vid-a.mp4", "kind": "video", "type": "video/mp4"], ["name": "photo1.jpg", "kind": "image", "type": "image/jpeg"],
+               ["name": "vid-b.mp4", "kind": "video", "type": "video/mp4"], ["name": "photo2.jpg", "kind": "image", "type": "image/jpeg"],
+               ["name": "beat-124.wav", "kind": "audio", "type": "audio/wav"]]
+    } else {
+      files = fileList
+    }
+    let filesJSON = String(data: try! JSONSerialization.data(withJSONObject: files), encoding: .utf8)!
+    let presetJSON = String(data: try! JSONSerialization.data(withJSONObject: [preset]), encoding: .utf8)!
+    return Self.scriptTemplate.replacingOccurrences(of: "__FILES__", with: filesJSON)
+      .replacingOccurrences(of: "__PRESET__", with: presetJSON)
+  }
+
+  static let scriptTemplate = """
   (async () => {
     const report = (o) => window.webkit.messageHandlers.reels.postMessage(JSON.stringify(o));
     try {
       for (let i = 0; i < 100 && !window.__reels; i++) await new Promise((r) => setTimeout(r, 100));
       const R = window.__reels;
       if (!R) throw new Error('window.__reels алга — main.js ачаалагдсангүй');
-      const names = ['vid-a.mp4', 'photo1.jpg', 'vid-b.mp4', 'photo2.jpg'];
-      const files = await Promise.all(names.map(async (n) => {
-        const res = await fetch('/__fixtures/' + n);
-        if (!res.ok) throw new Error('fixture ' + n + ': ' + res.status);
-        return new File([await res.blob()], n, { type: n.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg' });
-      }));
-      await R.addFiles(files);
+      const preset = __PRESET__[0];
+      if (R.recipe.preset !== preset) {
+        const sel = document.getElementById('preset');
+        if (![...sel.options].some((o) => o.value === preset)) throw new Error('загвар олдсонгүй: ' + preset);
+        sel.value = preset;
+        sel.dispatchEvent(new Event('change'));
+      }
+      const all = __FILES__;
+      const load = async (f) => {
+        const res = await fetch('/__fixtures/' + encodeURIComponent(f.name));
+        if (!res.ok) throw new Error('файл ' + f.name + ': ' + res.status);
+        return new File([await res.blob()], f.name, { type: f.type });
+      };
+      const clips = await Promise.all(all.filter((f) => f.kind !== 'audio').map(load));
+      if (!clips.length) throw new Error('хавтсанд бичлэг/зураг алга');
+      await R.addFiles(clips);
       // Хөгжим + BPM илрүүлэлт (WebKit-ийн OfflineAudioContext) — cut-ууд beat дээр буух ёстой
-      const musicRes = await fetch('/__fixtures/beat-124.wav');
+      const music = all.find((f) => f.kind === 'audio');
       let beats = null;
-      if (musicRes.ok) {
-        await R.audio.loadFile(new File([await musicRes.blob()], 'beat-124.wav', { type: 'audio/wav' }));
+      if (music) {
+        await R.audio.loadFile(await load(music));
         const { detectBeats } = await import('/js/beats.js');
         R.state.beats = await detectBeats(R.audio.buffer, R.recipe.beatSync);
         R.refresh();
+        await R.syncMusicOffset();
         beats = R.state.beats && { bpm: R.state.beats.bpm, offset: R.state.beats.offset, confidence: R.state.beats.confidence };
       }
       const caps = {
+        preset: R.recipe.preset,
+        clips: R.state.assets.map((a) => a.name),
         beats,
         bars: R.state.timeline.grid ? R.state.timeline.duration / R.state.timeline.grid.bar : null,
         mediaRecorder: typeof MediaRecorder,
@@ -123,7 +183,7 @@ struct SelfTest {
         coarsePointer: matchMedia('(pointer: coarse)').matches,
       };
       document.getElementById('exportBtn').click();
-      for (let i = 0; i < 240 && !R.state.result; i++) await new Promise((r) => setTimeout(r, 250));
+      for (let i = 0; i < 2400 && !R.state.result; i++) await new Promise((r) => setTimeout(r, 250));
       if (!R.state.result) throw new Error('экспорт дуусаагүй: ' + document.getElementById('toast').textContent);
       const v = document.getElementById('resultVideo');
       if (v.readyState < 1) await new Promise((r) => { v.addEventListener('loadedmetadata', r, { once: true }); setTimeout(r, 5000); });
@@ -223,8 +283,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     webView.load(URLRequest(url: startURL))
 
-    if selfTest != nil {
-      DispatchQueue.main.asyncAfter(deadline: .now() + 150) { [weak self] in
+    if let selfTest {
+      DispatchQueue.main.asyncAfter(deadline: .now() + selfTest.timeoutSeconds) { [weak self] in
         self?.finishSelfTest(ok: false, reason: "timeout")
       }
     }
@@ -354,8 +414,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
   }
 
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-    if selfTest != nil {
-      webView.evaluateJavaScript(SelfTest.script)
+    if let selfTest {
+      webView.evaluateJavaScript(selfTest.script)
     }
   }
 
@@ -451,20 +511,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     if (window.__reels && window.__reels.markSaved) window.__reels.markSaved(source);
     return window.__reels ? window.__reels.pendingWork(false) : null;
     """
-    if selfTest != nil {
+    if let selfTest {
       // Хадгалсны дараа "хадгалаагүй видео" гэж дахин асуух ёсгүй
       webView.callAsyncJavaScript(markSaved, arguments: ["source": source], in: nil, in: .page) { [weak self] result in
         guard let self else { return }
-        let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? -1
+        var finalURL = url
+        if selfTest.mode == .render, let name = selfTest.outName {
+          let renamed = selfTest.outDir.appendingPathComponent(name + "." + url.pathExtension)
+          try? FileManager.default.removeItem(at: renamed)
+          if (try? FileManager.default.moveItem(at: url, to: renamed)) != nil { finalURL = renamed }
+        }
+        let size = (try? FileManager.default.attributesOfItem(atPath: finalURL.path)[.size] as? Int) ?? -1
         let expected = self.selfTestReport["size"] as? Int ?? -2
         let pendingAfterSave = try? result.get() as? String
-        self.selfTestReport["savedFile"] = url.path
+        self.selfTestReport["savedFile"] = finalURL.path
         self.selfTestReport["savedSize"] = size
         self.selfTestReport["pendingAfterSave"] = pendingAfterSave ?? NSNull()
         let quitPrompted = self.selfTestReport["quitPrompt"] as? Bool == true
         var problems: [String] = []
         if size <= 0 || size != expected { problems.append("saved size mismatch") }
-        if !quitPrompted { problems.append("no quit prompt for unsaved video") }
+        if selfTest.mode == .selftest && !quitPrompted { problems.append("no quit prompt for unsaved video") }
         if pendingAfterSave != nil { problems.append("still pending after save") }
         self.finishSelfTest(ok: problems.isEmpty, reason: problems.isEmpty ? nil : problems.joined(separator: "; "))
       }
@@ -543,7 +609,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
       pendingReload = obj["reload"] as? String
     case "exported":
       selfTestReport.merge(obj) { _, new in new }
-      if selfTest != nil { selfTestQuitPromptThenSave() }
+      if selfTest?.mode == .render {
+        webView.evaluateJavaScript("document.getElementById('saveBtn').click(); null")
+      } else if selfTest != nil {
+        selfTestQuitPromptThenSave()
+      }
     case "error":
       finishSelfTest(ok: false, reason: obj["message"] as? String ?? "unknown")
     default:

@@ -4,3 +4,4 @@ node_modules/
 test-fixtures/
 dist/
 mac/AppIcon-preview.png
+generated/

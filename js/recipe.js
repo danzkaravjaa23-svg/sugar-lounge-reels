@@ -133,7 +133,8 @@ export const recipe = {
     cocktail: {
       label: 'Коктейль · 10с',
       hint: 'Нэг коктейлийн ASMR, давтагдах (loop)',
-      timing: { targetDuration: 10, minClip: 1.0, maxClip: 2.5 },
+      // Коктейлийн reel зориуд дараалалтай (цутгах → мөс → хутгах → чимэглэл → эргэлт) тул hero-г автоматаар солихгүй
+      timing: { targetDuration: 10, minClip: 1.0, maxClip: 2.5, heroFirst: false },
       beatSync: { weights: { 2: 0.6, 4: 0.4 } },
       energyCurve: { enabled: false },
       intro: { text: 'Sugar Martini', subText: '', duration: 1.5, font: 'sans', size: 84 },
