@@ -6,11 +6,13 @@
    **Finder дээр програмыг баруун товчоор дараад "Open" → дахин "Open"** гэхэд нээгдэнэ.
    Хэрэв "Open" товч гарахгүй бол: System Settings → Privacy & Security → доош гүйлгээд **Open Anyway**.
 
-   Эсвэл Terminal-д нэг мөр:
+   Эсвэл Terminal-д нэг мөр (задалсан хавтсаа зааж):
 
    ```bash
    xattr -dr com.apple.quarantine ~/Downloads/"Sugar Lounge Reels.app"
    ```
+
+   ⚠ Анхааруулга дээр **"Move to Trash" битгий дар** — програмыг устгана. Устгачихсан бол zip-ээ дахин задална.
 
 4. Давхар товшоод л ажиллана — интернэт, хөтөч хэрэггүй. Видео нь MP4.
 
