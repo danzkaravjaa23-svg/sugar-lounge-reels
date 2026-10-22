@@ -33,16 +33,11 @@ jobs:
 
       - name: Self-test (export + save a reel headlessly)
         run: |
-          python3 -m pip install --quiet pillow
           swiftc -O scripts/make_fixtures.swift -o dist/make_fixtures
           mkdir -p test-fixtures
           dist/make_fixtures test-fixtures/vid-a.mp4 3.2 0.48 0.12 0.31
           dist/make_fixtures test-fixtures/vid-b.mp4 4.5 0.12 0.31 0.48
-          python3 - <<'EOF'
-          from PIL import Image
-          for i, c in enumerate([(255, 95, 162), (255, 211, 110)], start=1):
-              Image.new("RGB", (1080, 1920), c).save(f"test-fixtures/photo{i}.jpg")
-          EOF
+          python3 scripts/make_test_photos.py test-fixtures
           python3 scripts/make_test_music.py 124
           "dist/Sugar Lounge Reels.app/Contents/MacOS/SugarLoungeReels" --selftest "$PWD/test-fixtures" "$PWD/dist/selftest"
 
